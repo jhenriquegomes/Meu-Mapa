@@ -70,6 +70,7 @@ const resources = {
         mapConfigRequired: 'Map Configuration Required',
         confirmDeleteArea: "Delete this area? Territories in this area will be moved to 'No Group'.",
         confirmDeleteActivity: 'Are you sure you want to delete this activity record?',
+        editTip: 'Tip: Drag the points on the map to change the shape.',
       }
     }
   },
@@ -140,6 +141,7 @@ const resources = {
         mapConfigRequired: 'Configuração de Mapa Necessária',
         confirmDeleteArea: "Excluir esta área? Territórios nesta área serão movidos para 'Sem Grupo'.",
         confirmDeleteActivity: 'Tem certeza que deseja excluir este registro de atividade?',
+        editTip: 'Dica: Arraste os pontos no mapa para alterar o formato.',
       }
     }
   },
@@ -210,6 +212,7 @@ const resources = {
         mapConfigRequired: 'Configuración de Mapa Requerida',
         confirmDeleteArea: "¿Eliminar esta área? Los territorios en esta área se moverán a 'Sin Grupo'.",
         confirmDeleteActivity: '¿Está seguro de que deseja eliminar este registro de actividad?',
+        editTip: 'Consejo: Arrastre os puntos no mapa para alterar o formato.',
       }
     }
   }

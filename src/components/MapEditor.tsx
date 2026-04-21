@@ -55,8 +55,9 @@ const getCentroid = (points: Point[]): Point | null => {
 const TerritoryOverlay: React.FC<{ 
   territories: Territory[], 
   selectedId: string | null, 
-  onSelect: (id: string) => void 
-}> = ({ territories, selectedId, onSelect }) => {
+  onSelect: (id: string) => void,
+  onSaveTerritory: (territory: Territory) => void
+}> = ({ territories, selectedId, onSelect, onSaveTerritory }) => {
   const map = useMap();
   const maps = useMapsLibrary('maps');
 
@@ -72,6 +73,10 @@ const TerritoryOverlay: React.FC<{
           <React.Fragment key={t.id}>
             <Polygon
               paths={t.points}
+              editable={selectedId === t.id}
+              onPathChange={(newPoints: Point[]) => {
+                onSaveTerritory({ ...t, points: newPoints });
+              }}
               options={{
                 fillColor: t.color,
                 fillOpacity: selectedId === t.id ? 0.6 : 0.4,
@@ -175,8 +180,44 @@ const Polygon = (props: any) => {
   React.useEffect(() => {
     if (!polygon) return;
     polygon.setOptions(props.options);
-    polygon.setPaths(props.paths);
-  }, [polygon, props.options, props.paths]);
+    
+    // Check if paths actually changed to avoid infinite loops
+    const currentPaths = polygon.getPaths().getAt(0).getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
+    if (JSON.stringify(currentPaths) !== JSON.stringify(props.paths)) {
+      polygon.setPaths(props.paths);
+    }
+
+    if (props.editable) {
+      polygon.setEditable(true);
+      polygon.setDraggable(true);
+      
+      const onEdit = () => {
+        const path = polygon.getPath();
+        const newPoints = [];
+        for (let i = 0; i < path.getLength(); i++) {
+          const point = path.getAt(i);
+          newPoints.push({ lat: point.lat(), lng: point.lng() });
+        }
+        if (props.onPathChange) {
+          props.onPathChange(newPoints);
+        }
+      };
+
+      const listeners = [
+        polygon.getPath().addListener('set_at', onEdit),
+        polygon.getPath().addListener('insert_at', onEdit),
+        polygon.getPath().addListener('remove_at', onEdit),
+        polygon.addListener('dragend', onEdit)
+      ];
+
+      return () => {
+        listeners.forEach(l => l.remove());
+      };
+    } else {
+      polygon.setEditable(false);
+      polygon.setDraggable(false);
+    }
+  }, [polygon, props.options, props.paths, props.editable]);
 
   React.useEffect(() => {
     if (!polygon || !props.onClick) return;
@@ -231,8 +272,9 @@ const GoogleMapHandler = ({ center }: { center: google.maps.LatLngLiteral }) => 
 const LeafletTerritoryOverlay: React.FC<{ 
   territories: Territory[], 
   selectedId: string | null, 
-  onSelect: (id: string) => void 
-}> = ({ territories, selectedId, onSelect }) => {
+  onSelect: (id: string) => void,
+  onSaveTerritory: (territory: Territory) => void
+}> = ({ territories, selectedId, onSelect, onSaveTerritory }) => {
   return (
     <>
       {territories.map(t => {
@@ -641,6 +683,7 @@ export const MapEditor: React.FC<MapEditorProps> = ({
                 territories={territories} 
                 selectedId={selectedTerritoryId}
                 onSelect={setSelectedTerritoryId}
+                onSaveTerritory={onSaveTerritory}
               />
 
               {/* Current Drawing Path */}
@@ -675,6 +718,7 @@ export const MapEditor: React.FC<MapEditorProps> = ({
                 territories={territories} 
                 selectedId={selectedTerritoryId}
                 onSelect={setSelectedTerritoryId}
+                onSaveTerritory={onSaveTerritory}
               />
 
               {/* Current Drawing Path */}
@@ -861,6 +905,9 @@ export const MapEditor: React.FC<MapEditorProps> = ({
                     onChange={(e) => onSaveTerritory({ ...selectedTerritory, name: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                   />
+                  <p className="text-[10px] text-blue-500 font-medium italic mt-1 italic">
+                    * {t('map.editTip', 'Dica: Arraste os pontos no mapa para alterar o formato.')}
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
