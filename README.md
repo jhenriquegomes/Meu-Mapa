@@ -7,6 +7,9 @@
 This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/c666d7ab-1365-4f37-b6fc-b8622160408d
+
+ou
+
 https://territorio-189557265625.us-west1.run.app/ 
 ## Run Locally
 
