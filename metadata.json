@@ -1,0 +1,6 @@
+{
+  "name": "Territorio",
+  "description": "A powerful tool for creating, managing, and color-coding custom geographic territories with real-time mapping.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": []
+}

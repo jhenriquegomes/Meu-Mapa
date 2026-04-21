@@ -1,0 +1,63 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Default Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // GLOBAL HELPERS
+    // ===============================================================
+    
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email.lower() == "henrique.gomes50223@gmail.com" ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // ===============================================================
+    // RESOURCE RULES
+    // ===============================================================
+
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+    }
+
+    match /maps/{mapId} {
+      function getMapOwner() {
+        return get(/databases/$(database)/documents/maps/$(mapId)).data.userId;
+      }
+
+      function isMapOwner() {
+        return (resource != null && resource.data.userId == request.auth.uid) || 
+               (request.resource != null && request.resource.data.userId == request.auth.uid);
+      }
+
+      // Root Map Rules
+      allow read: if isSignedIn() && (isAdmin() || isMapOwner());
+      allow create: if isSignedIn() && (isAdmin() || request.resource.data.userId == request.auth.uid);
+      allow update: if isSignedIn() && (isAdmin() || isMapOwner());
+      allow delete: if isSignedIn() && (isAdmin() || isMapOwner());
+
+      // Territories Subcollection
+      match /territories/{territoryId} {
+        allow read: if isSignedIn() && (isAdmin() || getMapOwner() == request.auth.uid);
+        allow create, update, delete: if isSignedIn() && (isAdmin() || getMapOwner() == request.auth.uid);
+      }
+
+      // Groups Subcollection
+      match /groups/{groupId} {
+        allow read: if isSignedIn() && (isAdmin() || getMapOwner() == request.auth.uid);
+        allow create, update, delete: if isSignedIn() && (isAdmin() || getMapOwner() == request.auth.uid);
+      }
+    }
+  }
+}

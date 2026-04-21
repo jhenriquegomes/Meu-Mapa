@@ -1,0 +1,64 @@
+{
+  "entities": {
+    "Map": {
+      "title": "Map",
+      "description": "A custom map containing multiple territories.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "The name of the map." },
+        "description": { "type": "string", "description": "A brief description of the map." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" }
+      },
+      "required": ["title", "userId", "createdAt"]
+    },
+    "Territory": {
+      "title": "Territory",
+      "description": "A specific region within a map.",
+      "type": "object",
+      "properties": {
+        "mapId": { "type": "string" },
+        "name": { "type": "string" },
+        "info": { "type": "string" },
+        "color": { "type": "string" },
+        "number": { "type": "number" },
+        "completionDate": { "type": "string", "format": "date" },
+        "responsiblePerson": { "type": "string" },
+        "points": { "type": "array", "description": "Array of points defining the polygon." },
+        "groupId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "northBoundary": { "type": "string" },
+        "southBoundary": { "type": "string" },
+        "eastBoundary": { "type": "string" },
+        "westBoundary": { "type": "string" }
+      },
+      "required": ["mapId", "name", "number", "points"]
+    },
+    "TerritoryGroup": {
+      "title": "Territory Group",
+      "description": "A group of territories categorized by color.",
+      "type": "object",
+      "properties": {
+        "mapId": { "type": "string" },
+        "name": { "type": "string" },
+        "color": { "type": "string" }
+      },
+      "required": ["mapId", "name", "color"]
+    }
+  },
+  "firestore": {
+    "/maps/{mapId}": {
+      "schema": "Map",
+      "description": "Collection of user-created maps."
+    },
+    "/maps/{mapId}/territories/{territoryId}": {
+      "schema": "Territory",
+      "description": "Territories within a specific map."
+    },
+    "/maps/{mapId}/groups/{groupId}": {
+      "schema": "TerritoryGroup",
+      "description": "Color groups for territories in a map."
+    }
+  }
+}
