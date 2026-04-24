@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from './components/Header';
 import { MapEditor } from './components/MapEditor';
 import { Territory, TerritoryGroup, MapData, MapProvider } from './types';
@@ -107,7 +107,7 @@ export default function App() {
     return unsubscribe;
   }, [activeMap]);
 
-  const handleSaveTerritory = async (territory: Territory) => {
+  const handleSaveTerritory = useCallback(async (territory: Territory) => {
     if (!activeMap) return;
     try {
       const territoryWithTimestamp = {
@@ -130,9 +130,9 @@ export default function App() {
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `maps/${activeMap.id}/territories`);
     }
-  };
+  }, [activeMap]);
 
-  const handleDeleteTerritory = async (id: string) => {
+  const handleDeleteTerritory = useCallback(async (id: string) => {
     if (!activeMap) return;
     console.log(`Attempting to delete territory: ${id} on map: ${activeMap.id}`);
     try {
@@ -142,9 +142,9 @@ export default function App() {
       console.error(`Failed to delete territory: ${id}`, err);
       handleFirestoreError(err, OperationType.DELETE, `maps/${activeMap.id}/territories/${id}`);
     }
-  };
+  }, [activeMap]);
 
-  const handleClearAllTerritories = async () => {
+  const handleClearAllTerritories = useCallback(async () => {
     if (!activeMap || territories.length === 0) return;
     
     // We loop through and delete because mass deletion is not a single call in Firestore client
@@ -157,9 +157,9 @@ export default function App() {
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `maps/${activeMap.id}/territories`);
     }
-  };
+  }, [activeMap, territories]);
 
-  const handleSaveGroup = async (group: TerritoryGroup) => {
+  const handleSaveGroup = useCallback(async (group: TerritoryGroup) => {
     if (!activeMap) return;
     try {
       const docRef = doc(db, `maps/${activeMap.id}/groups`, group.id);
@@ -168,9 +168,9 @@ export default function App() {
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `maps/${activeMap.id}/groups`);
     }
-  };
+  }, [activeMap]);
 
-  const handleDeleteGroup = async (id: string) => {
+  const handleDeleteGroup = useCallback(async (id: string) => {
     if (!activeMap) return;
     console.log(`Attempting to delete group: ${id} on map: ${activeMap.id}`);
     try {
@@ -180,7 +180,7 @@ export default function App() {
       console.error(`Failed to delete group: ${id}`, err);
       handleFirestoreError(err, OperationType.DELETE, `maps/${activeMap.id}/groups/${id}`);
     }
-  };
+  }, [activeMap]);
 
   if (loading) {
     return (

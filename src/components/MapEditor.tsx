@@ -55,9 +55,10 @@ const getCentroid = (points: Point[]): Point | null => {
 const TerritoryOverlay: React.FC<{ 
   territories: Territory[], 
   selectedId: string | null, 
+  isEditingShape: boolean,
   onSelect: (id: string) => void,
   onSaveTerritory: (territory: Territory) => void
-}> = ({ territories, selectedId, onSelect, onSaveTerritory }) => {
+}> = ({ territories, selectedId, isEditingShape, onSelect, onSaveTerritory }) => {
   const map = useMap();
   const maps = useMapsLibrary('maps');
 
@@ -73,15 +74,15 @@ const TerritoryOverlay: React.FC<{
           <React.Fragment key={t.id}>
             <Polygon
               paths={t.points}
-              editable={selectedId === t.id}
+              editable={selectedId === t.id && isEditingShape}
               onPathChange={(newPoints: Point[]) => {
                 onSaveTerritory({ ...t, points: newPoints });
               }}
               options={{
                 fillColor: t.color,
-                fillOpacity: selectedId === t.id ? 0.6 : 0.4,
+                fillOpacity: t.fillOpacity ?? (selectedId === t.id ? 0.6 : 0.4),
                 strokeColor: selectedId === t.id ? '#000' : t.color,
-                strokeWeight: selectedId === t.id ? 3 : 2,
+                strokeWeight: t.strokeWeight ?? (selectedId === t.id ? 3 : 2),
               }}
               onClick={() => onSelect(t.id)}
             />
@@ -272,9 +273,10 @@ const GoogleMapHandler = ({ center }: { center: google.maps.LatLngLiteral }) => 
 const LeafletTerritoryOverlay: React.FC<{ 
   territories: Territory[], 
   selectedId: string | null, 
+  isEditingShape: boolean,
   onSelect: (id: string) => void,
   onSaveTerritory: (territory: Territory) => void
-}> = ({ territories, selectedId, onSelect, onSaveTerritory }) => {
+}> = ({ territories, selectedId, isEditingShape, onSelect, onSaveTerritory }) => {
   return (
     <>
       {territories.map(t => {
@@ -310,9 +312,9 @@ const LeafletTerritoryOverlay: React.FC<{
               positions={leafletPoints}
               pathOptions={{
                 fillColor: t.color,
-                fillOpacity: selectedId === t.id ? 0.6 : 0.4,
+                fillOpacity: t.fillOpacity ?? (selectedId === t.id ? 0.6 : 0.4),
                 color: selectedId === t.id ? '#000' : t.color,
-                weight: selectedId === t.id ? 3 : 2,
+                weight: t.strokeWeight ?? (selectedId === t.id ? 3 : 2),
               }}
               eventHandlers={{
                 click: () => onSelect(t.id)
@@ -356,6 +358,7 @@ export const MapEditor: React.FC<MapEditorProps> = ({
   const [mapCenter, setMapCenter] = useState<Point>({ lat: -23.5505, lng: -46.6333 });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'areas' | 'territories' | 'activity'>('territories');
+  const [isEditingShape, setIsEditingShape] = useState(false);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -377,6 +380,23 @@ export const MapEditor: React.FC<MapEditorProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const mapRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Debounced save for geometry updates to prevent rate limiting
+  const debouncedSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const debouncedSaveTerritory = useCallback((territory: Territory) => {
+    if (debouncedSaveTimeoutRef.current) {
+      clearTimeout(debouncedSaveTimeoutRef.current);
+    }
+    debouncedSaveTimeoutRef.current = setTimeout(() => {
+      onSaveTerritory(territory);
+    }, 1000); // 1 second debounce for geometry
+  }, [onSaveTerritory]);
+
+  const handleSelectTerritory = useCallback((id: string) => {
+    setSelectedTerritoryId(id);
+    setIsSidebarOpen(true);
+    setIsEditingShape(false);
+  }, []);
 
   const selectedTerritory = territories.find(t => t.id === selectedTerritoryId);
 
@@ -671,7 +691,7 @@ export const MapEditor: React.FC<MapEditorProps> = ({
           {mapProvider === 'google' ? (
             <Map
               defaultCenter={mapCenter}
-              defaultZoom={12}
+              defaultZoom={15}
               onClick={handleMapClick}
               disableDefaultUI={true}
               zoomControl={true}
@@ -682,8 +702,9 @@ export const MapEditor: React.FC<MapEditorProps> = ({
               <TerritoryOverlay 
                 territories={territories} 
                 selectedId={selectedTerritoryId}
-                onSelect={setSelectedTerritoryId}
-                onSaveTerritory={onSaveTerritory}
+                isEditingShape={isEditingShape}
+                onSelect={handleSelectTerritory}
+                onSaveTerritory={debouncedSaveTerritory}
               />
 
               {/* Current Drawing Path */}
@@ -704,7 +725,7 @@ export const MapEditor: React.FC<MapEditorProps> = ({
           ) : (
             <MapContainer 
               center={[mapCenter.lat, mapCenter.lng]} 
-              zoom={12} 
+              zoom={15} 
               style={{ height: '100%', width: '100%', zIndex: 1 }}
               zoomControl={true}
             >
@@ -717,8 +738,9 @@ export const MapEditor: React.FC<MapEditorProps> = ({
               <LeafletTerritoryOverlay 
                 territories={territories} 
                 selectedId={selectedTerritoryId}
-                onSelect={setSelectedTerritoryId}
-                onSaveTerritory={onSaveTerritory}
+                isEditingShape={isEditingShape}
+                onSelect={handleSelectTerritory}
+                onSaveTerritory={debouncedSaveTerritory}
               />
 
               {/* Current Drawing Path */}
@@ -890,7 +912,10 @@ export const MapEditor: React.FC<MapEditorProps> = ({
                 className="space-y-4"
               >
                 <button 
-                  onClick={() => setSelectedTerritoryId(null)}
+                  onClick={() => {
+                    setSelectedTerritoryId(null);
+                    setIsEditingShape(false);
+                  }}
                   className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase hover:text-black transition-colors mb-2"
                 >
                   <ChevronLeft size={14} />
@@ -898,7 +923,19 @@ export const MapEditor: React.FC<MapEditorProps> = ({
                 </button>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-gray-400 uppercase">{t('fields.name')}</label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-medium text-gray-400 uppercase">{t('fields.name')}</label>
+                    <button
+                      onClick={() => setIsEditingShape(!isEditingShape)}
+                      className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${
+                        isEditingShape 
+                          ? 'bg-blue-600 text-white' 
+                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      }`}
+                    >
+                      {isEditingShape ? 'TRAVAR FORMATO' : 'EDITAR FORMATO'}
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={selectedTerritory.name}
@@ -943,6 +980,47 @@ export const MapEditor: React.FC<MapEditorProps> = ({
                           />
                         ))}
                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-gray-400 uppercase flex items-center gap-1">
+                      {t('fields.opacity')}
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={selectedTerritory.fillOpacity ?? 0.4}
+                      onChange={(e) => onSaveTerritory({ ...selectedTerritory, fillOpacity: parseFloat(e.target.value) })}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                    />
+                    <div className="flex justify-between text-[10px] text-gray-400 font-bold">
+                      <span>0%</span>
+                      <span>{( (selectedTerritory.fillOpacity ?? 0.4) * 100).toFixed(0)}%</span>
+                      <span>100%</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-gray-400 uppercase flex items-center gap-1">
+                      {t('fields.borderWidth')}
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      step="1"
+                      value={selectedTerritory.strokeWeight ?? 2}
+                      onChange={(e) => onSaveTerritory({ ...selectedTerritory, strokeWeight: parseInt(e.target.value) })}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                    />
+                    <div className="flex justify-between text-[10px] text-gray-400 font-bold">
+                      <span>1px</span>
+                      <span>{selectedTerritory.strokeWeight ?? 2}px</span>
+                      <span>10px</span>
                     </div>
                   </div>
                 </div>
@@ -1228,7 +1306,20 @@ export const MapEditor: React.FC<MapEditorProps> = ({
 
                 <div className="space-y-2">
                   {territories
-                    .filter(terr => terr.name.toLowerCase().includes(searchQuery.toLowerCase()) || terr.number.toString().includes(searchQuery))
+                    .filter(terr => {
+                      const searchLower = searchQuery.toLowerCase();
+                      const matchesName = terr.name.toLowerCase().includes(searchLower);
+                      const matchesNumber = terr.number.toString().includes(searchQuery);
+                      
+                      if (matchesName || matchesNumber) return true;
+                      
+                      if (terr.groupId) {
+                        const group = groups.find(g => g.id === terr.groupId);
+                        return group?.name.toLowerCase().includes(searchLower);
+                      }
+                      
+                      return false;
+                    })
                     .sort((a, b) => a.number - b.number)
                     .map(terr => {
                       const group = groups.find(g => g.id === terr.groupId);
