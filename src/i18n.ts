@@ -63,6 +63,10 @@ const resources = {
         searchPlaceholder: 'Search territories...',
         opacity: 'Opacity',
         borderWidth: 'Border Width',
+        strokeColor: 'Border Color',
+        drawingTools: 'Drawing Tools',
+        area: 'Area',
+        line: 'Line',
       },
       messages: {
         confirmClear: 'Are you sure you want to delete ALL territories? This action cannot be undone.',
@@ -137,6 +141,10 @@ const resources = {
         searchPlaceholder: 'Buscar territórios...',
         opacity: 'Opacidade',
         borderWidth: 'Espessura da Borda',
+        strokeColor: 'Cor da Borda',
+        drawingTools: 'Ferramentas de Desenho',
+        area: 'Área',
+        line: 'Linha',
       },
       messages: {
         confirmClear: 'Tem certeza que deseja excluir TODOS os territórios? Esta ação não pode ser desfeita.',
@@ -211,6 +219,10 @@ const resources = {
         searchPlaceholder: 'Buscar territorios...',
         opacity: 'Opacidad',
         borderWidth: 'Grosor del Borde',
+        strokeColor: 'Color del Borde',
+        drawingTools: 'Herramientas de Dibujo',
+        area: 'Área',
+        line: 'Línea',
       },
       messages: {
         confirmClear: '¿Está seguro de que deseja eliminar TODOS los territorios? Esta acción no se puede deshacer.',

@@ -8,8 +8,10 @@ import {
   ControlPosition,
   useApiIsLoaded
 } from '@vis.gl/react-google-maps';
-import { MapContainer, TileLayer, Polygon as LeafletPolygon, Marker as LeafletMarker, useMap as useLeafletMap, Tooltip as LeafletTooltip } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon as LeafletPolygon, Polyline as LeafletPolyline, Marker as LeafletMarker, useMap as useLeafletMap, Tooltip as LeafletTooltip } from 'react-leaflet';
 import L from 'leaflet';
+import '@geoman-io/leaflet-geoman-free';
+import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 import { Point, Territory, TerritoryGroup, MapProvider } from '../types';
 import { Plus, Save, Trash2, Info, Calendar, Hash, Palette, X, Map as MapIcon, AlertTriangle, CheckCircle2, Search, Download, Camera, Clock, FileText, Menu, Settings, Layers, Globe, User, Upload, Activity, History, ChevronLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -72,20 +74,35 @@ const TerritoryOverlay: React.FC<{
 
         return (
           <React.Fragment key={t.id}>
-            <Polygon
-              paths={t.points}
-              editable={selectedId === t.id && isEditingShape}
-              onPathChange={(newPoints: Point[]) => {
-                onSaveTerritory({ ...t, points: newPoints });
-              }}
-              options={{
-                fillColor: t.color,
-                fillOpacity: t.fillOpacity ?? (selectedId === t.id ? 0.6 : 0.4),
-                strokeColor: selectedId === t.id ? '#000' : t.color,
-                strokeWeight: t.strokeWeight ?? (selectedId === t.id ? 3 : 2),
-              }}
-              onClick={() => onSelect(t.id)}
-            />
+            {t.type === 'line' ? (
+              <Polyline
+                paths={t.points}
+                editable={selectedId === t.id && isEditingShape}
+                onPathChange={(newPoints: Point[]) => {
+                  onSaveTerritory({ ...t, points: newPoints });
+                }}
+                options={{
+                  strokeColor: t.strokeColor || (selectedId === t.id ? '#000' : t.color),
+                  strokeWeight: t.strokeWeight ?? (selectedId === t.id ? 3 : 2),
+                }}
+                onClick={() => onSelect(t.id)}
+              />
+            ) : (
+              <Polygon
+                paths={t.points}
+                editable={selectedId === t.id && isEditingShape}
+                onPathChange={(newPoints: Point[]) => {
+                  onSaveTerritory({ ...t, points: newPoints });
+                }}
+                options={{
+                  fillColor: t.color,
+                  fillOpacity: t.fillOpacity ?? (selectedId === t.id ? 0.6 : 0.4),
+                  strokeColor: t.strokeColor || (selectedId === t.id ? '#000' : t.color),
+                  strokeWeight: t.strokeWeight ?? (selectedId === t.id ? 3 : 2),
+                }}
+                onClick={() => onSelect(t.id)}
+              />
+            )}
             <LabelOverlay 
               position={centroid} 
               text={(t.number || 0).toString()} 
@@ -231,6 +248,75 @@ const Polygon = (props: any) => {
   return null;
 };
 
+// Polyline component for @vis.gl/react-google-maps
+const Polyline = (props: any) => {
+  const map = useMap();
+  const [polyline, setPolyline] = useState<google.maps.Polyline | null>(null);
+
+  React.useEffect(() => {
+    if (!map || !window.google) return;
+    try {
+      const poly = new google.maps.Polyline(props.options);
+      poly.setMap(map);
+      setPolyline(poly);
+      return () => poly.setMap(null);
+    } catch (e) {
+      console.error('Error creating polyline:', e);
+    }
+  }, [map]);
+
+  React.useEffect(() => {
+    if (!polyline) return;
+    polyline.setOptions(props.options);
+    
+    const currentPaths = polyline.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
+    if (JSON.stringify(currentPaths) !== JSON.stringify(props.paths)) {
+      polyline.setPath(props.paths);
+    }
+
+    if (props.editable) {
+      polyline.setEditable(true);
+      polyline.setDraggable(true);
+      
+      const onEdit = () => {
+        const path = polyline.getPath();
+        const newPoints = [];
+        for (let i = 0; i < path.getLength(); i++) {
+          const point = path.getAt(i);
+          newPoints.push({ lat: point.lat(), lng: point.lng() });
+        }
+        if (props.onPathChange) {
+          props.onPathChange(newPoints);
+        }
+      };
+
+      const listeners = [
+        polyline.getPath().addListener('set_at', onEdit),
+        polyline.getPath().addListener('insert_at', onEdit),
+        polyline.getPath().addListener('remove_at', onEdit),
+        polyline.addListener('dragend', onEdit)
+      ];
+
+      return () => {
+        listeners.forEach(l => l.remove());
+      };
+    } else {
+      polyline.setEditable(false);
+      polyline.setDraggable(false);
+    }
+  }, [polyline, props.options, props.paths, props.editable]);
+
+  React.useEffect(() => {
+    if (!polyline || !props.onClick) return;
+    const listener = polyline.addListener('click', props.onClick);
+    return () => {
+      if (listener) listener.remove();
+    };
+  }, [polyline, props.onClick]);
+
+  return null;
+};
+
 // --- LEAFLET HELPERS ---
 
 const LeafletMapEvents = ({ onClick }: { onClick: (e: any) => void }) => {
@@ -255,6 +341,59 @@ const SetViewOnCenterChange = ({ center }: { center: [number, number] }) => {
     }
   }, [center, map]);
   return null;
+};
+
+const LeafletEditablePolyline = ({ positions, pathOptions, editable, onPointsChange, eventHandlers }: any) => {
+  const polyRef = useRef<L.Polyline | null>(null);
+
+  useEffect(() => {
+    const poly = polyRef.current;
+    if (!poly) return;
+
+    if (editable) {
+      // @ts-ignore - pm is added by leaflet-geoman
+      if (poly.pm) {
+        // @ts-ignore
+        poly.pm.enable();
+        poly.on('pm:edit', (e: any) => {
+          const latLngs = e.target.getLatLngs();
+          // Geoman returns a flat array for Polylines
+          const newPoints = latLngs.map((ll: L.LatLng) => ({ lat: ll.lat, lng: ll.lng }));
+          onPointsChange(newPoints);
+        });
+        poly.on('pm:dragend', (e: any) => {
+          const latLngs = e.target.getLatLngs();
+          const newPoints = latLngs.map((ll: L.LatLng) => ({ lat: ll.lat, lng: ll.lng }));
+          onPointsChange(newPoints);
+        });
+      }
+    } else {
+      // @ts-ignore
+      if (poly.pm) {
+        // @ts-ignore
+        poly.pm.disable();
+      }
+    }
+
+    return () => {
+      // @ts-ignore
+      if (poly.pm) {
+        // @ts-ignore
+        poly.pm.disable();
+      }
+      poly.off('pm:edit');
+      poly.off('pm:dragend');
+    };
+  }, [editable, onPointsChange]);
+
+  return (
+    <LeafletPolyline 
+      ref={polyRef}
+      positions={positions}
+      pathOptions={pathOptions}
+      eventHandlers={eventHandlers}
+    />
+  );
 };
 
 const GoogleMapHandler = ({ center }: { center: google.maps.LatLngLiteral }) => {
@@ -308,18 +447,35 @@ const LeafletTerritoryOverlay: React.FC<{
 
         return (
           <React.Fragment key={t.id}>
-            <LeafletPolygon
-              positions={leafletPoints}
-              pathOptions={{
-                fillColor: t.color,
-                fillOpacity: t.fillOpacity ?? (selectedId === t.id ? 0.6 : 0.4),
-                color: selectedId === t.id ? '#000' : t.color,
-                weight: t.strokeWeight ?? (selectedId === t.id ? 3 : 2),
-              }}
-              eventHandlers={{
-                click: () => onSelect(t.id)
-              }}
-            />
+            {t.type === 'line' ? (
+              <LeafletEditablePolyline
+                positions={leafletPoints}
+                pathOptions={{
+                  color: t.strokeColor || (selectedId === t.id ? '#000' : t.color),
+                  weight: t.strokeWeight ?? (selectedId === t.id ? 3 : 2),
+                }}
+                editable={selectedId === t.id && isEditingShape}
+                onPointsChange={(newPoints: Point[]) => {
+                  onSaveTerritory({ ...t, points: newPoints });
+                }}
+                eventHandlers={{
+                  click: () => onSelect(t.id)
+                }}
+              />
+            ) : (
+              <LeafletPolygon
+                positions={leafletPoints}
+                pathOptions={{
+                  fillColor: t.color,
+                  fillOpacity: t.fillOpacity ?? (selectedId === t.id ? 0.6 : 0.4),
+                  color: t.strokeColor || (selectedId === t.id ? '#000' : t.color),
+                  weight: t.strokeWeight ?? (selectedId === t.id ? 3 : 2),
+                }}
+                eventHandlers={{
+                  click: () => onSelect(t.id)
+                }}
+              />
+            )}
             <LeafletMarker 
               position={[centroid.lat, centroid.lng]} 
               icon={pinIcon}
@@ -359,6 +515,7 @@ export const MapEditor: React.FC<MapEditorProps> = ({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'areas' | 'territories' | 'activity'>('territories');
   const [isEditingShape, setIsEditingShape] = useState(false);
+  const [drawingType, setDrawingType] = useState<'area' | 'line'>('area');
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -608,7 +765,8 @@ export const MapEditor: React.FC<MapEditorProps> = ({
   };
 
   const finishDrawing = () => {
-    if (currentPoints.length < 3) {
+    const minPoints = drawingType === 'area' ? 3 : 2;
+    if (currentPoints.length < minPoints) {
       setIsDrawing(false);
       setCurrentPoints([]);
       return;
@@ -617,13 +775,14 @@ export const MapEditor: React.FC<MapEditorProps> = ({
     const newTerritory: Territory = {
       id: Math.random().toString(36).substr(2, 9),
       mapId: 'default',
-      name: `${t('map.new')} ${territories.length + 1}`,
+      name: `${t(drawingType === 'area' ? 'map.new' : 'line')} ${territories.length + 1}`,
       info: '',
       color: '#3B82F6',
       number: territories.length + 1,
       completionDate: null,
       responsiblePerson: '',
       points: currentPoints,
+      type: drawingType,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -691,7 +850,7 @@ export const MapEditor: React.FC<MapEditorProps> = ({
           {mapProvider === 'google' ? (
             <Map
               defaultCenter={mapCenter}
-              defaultZoom={15}
+              defaultZoom={18}
               onClick={handleMapClick}
               disableDefaultUI={true}
               zoomControl={true}
@@ -709,23 +868,34 @@ export const MapEditor: React.FC<MapEditorProps> = ({
 
               {/* Current Drawing Path */}
               {isDrawing && currentPoints.length > 0 && (
-                <Polygon
-                  paths={currentPoints}
-                  options={{
-                    fillColor: '#3B82F6',
-                    fillOpacity: 0.2,
-                    strokeColor: '#3B82F6',
-                    strokeWeight: 2,
-                    strokeDasharray: '4',
-                  }}
-                />
+                drawingType === 'area' ? (
+                  <Polygon
+                    paths={currentPoints}
+                    options={{
+                      fillColor: '#3B82F6',
+                      fillOpacity: 0.2,
+                      strokeColor: '#3B82F6',
+                      strokeWeight: 2,
+                      strokeDasharray: '4',
+                    }}
+                  />
+                ) : (
+                  <Polyline
+                    paths={currentPoints}
+                    options={{
+                      strokeColor: '#3B82F6',
+                      strokeWeight: 2,
+                      strokeDasharray: '4',
+                    }}
+                  />
+                )
               )}
 
             </Map>
           ) : (
             <MapContainer 
               center={[mapCenter.lat, mapCenter.lng]} 
-              zoom={15} 
+              zoom={18} 
               style={{ height: '100%', width: '100%', zIndex: 1 }}
               zoomControl={true}
             >
@@ -745,16 +915,27 @@ export const MapEditor: React.FC<MapEditorProps> = ({
 
               {/* Current Drawing Path */}
               {isDrawing && currentPoints.length > 0 && (
-                <LeafletPolygon
-                  positions={currentPoints.map(p => [p.lat, p.lng] as L.LatLngExpression)}
-                  pathOptions={{
-                    fillColor: '#3B82F6',
-                    fillOpacity: 0.2,
-                    color: '#3B82F6',
-                    weight: 2,
-                    dashArray: '4',
-                  }}
-                />
+                drawingType === 'area' ? (
+                  <LeafletPolygon
+                    positions={currentPoints.map(p => [p.lat, p.lng] as L.LatLngExpression)}
+                    pathOptions={{
+                      fillColor: '#3B82F6',
+                      fillOpacity: 0.2,
+                      color: '#3B82F6',
+                      weight: 2,
+                      dashArray: '4',
+                    }}
+                  />
+                ) : (
+                  <LeafletPolyline
+                    positions={currentPoints.map(p => [p.lat, p.lng] as L.LatLngExpression)}
+                    pathOptions={{
+                      color: '#3B82F6',
+                      weight: 2,
+                      dashArray: '4',
+                    }}
+                  />
+                )
               )}
 
             </MapContainer>
@@ -829,6 +1010,25 @@ export const MapEditor: React.FC<MapEditorProps> = ({
                     <X size={18} />
                     <span>{t('map.cancel')}</span>
                   </button>
+
+                  <div className="flex bg-white rounded-lg shadow-lg border border-gray-200 p-1">
+                    <button
+                      onClick={() => setDrawingType('area')}
+                      className={`px-3 py-1 text-[10px] font-bold uppercase rounded-md transition-all ${
+                        drawingType === 'area' ? 'bg-black text-white' : 'text-gray-400 hover:text-gray-600'
+                      }`}
+                    >
+                      {t('fields.area')}
+                    </button>
+                    <button
+                      onClick={() => setDrawingType('line')}
+                      className={`px-3 py-1 text-[10px] font-bold uppercase rounded-md transition-all ${
+                        drawingType === 'line' ? 'bg-black text-white' : 'text-gray-400 hover:text-gray-600'
+                      }`}
+                    >
+                      {t('fields.line')}
+                    </button>
+                  </div>
                 </>
               )}
             </div>
@@ -947,6 +1147,25 @@ export const MapEditor: React.FC<MapEditorProps> = ({
                   </p>
                 </div>
 
+                <div className="flex bg-gray-50 border border-gray-100 p-1 rounded-lg">
+                  <button
+                    onClick={() => onSaveTerritory({ ...selectedTerritory, type: 'area' })}
+                    className={`flex-1 py-1.5 text-[10px] font-bold uppercase rounded transition-all ${
+                      selectedTerritory.type !== 'line' ? 'bg-white text-black shadow-sm' : 'text-gray-400 opacity-50'
+                    }`}
+                  >
+                    {t('fields.area')}
+                  </button>
+                  <button
+                    onClick={() => onSaveTerritory({ ...selectedTerritory, type: 'line' })}
+                    className={`flex-1 py-1.5 text-[10px] font-bold uppercase rounded transition-all ${
+                      selectedTerritory.type === 'line' ? 'bg-white text-black shadow-sm' : 'text-gray-400 opacity-50'
+                    }`}
+                  >
+                    {t('fields.line')}
+                  </button>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-medium text-gray-400 uppercase flex items-center gap-1">
@@ -985,26 +1204,28 @@ export const MapEditor: React.FC<MapEditorProps> = ({
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-gray-400 uppercase flex items-center gap-1">
-                      {t('fields.opacity')}
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={selectedTerritory.fillOpacity ?? 0.4}
-                      onChange={(e) => onSaveTerritory({ ...selectedTerritory, fillOpacity: parseFloat(e.target.value) })}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                    />
-                    <div className="flex justify-between text-[10px] text-gray-400 font-bold">
-                      <span>0%</span>
-                      <span>{( (selectedTerritory.fillOpacity ?? 0.4) * 100).toFixed(0)}%</span>
-                      <span>100%</span>
+                  {selectedTerritory.type !== 'line' && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-gray-400 uppercase flex items-center gap-1">
+                        {t('fields.opacity')}
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.1"
+                        value={selectedTerritory.fillOpacity ?? 0.4}
+                        onChange={(e) => onSaveTerritory({ ...selectedTerritory, fillOpacity: parseFloat(e.target.value) })}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-400 font-bold">
+                        <span>0%</span>
+                        <span>{( (selectedTerritory.fillOpacity ?? 0.4) * 100).toFixed(0)}%</span>
+                        <span>100%</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="space-y-1">
+                  )}
+                  <div className={`space-y-1 ${selectedTerritory.type === 'line' ? 'col-span-2' : ''}`}>
                     <label className="text-xs font-medium text-gray-400 uppercase flex items-center gap-1">
                       {t('fields.borderWidth')}
                     </label>
@@ -1021,6 +1242,30 @@ export const MapEditor: React.FC<MapEditorProps> = ({
                       <span>1px</span>
                       <span>{selectedTerritory.strokeWeight ?? 2}px</span>
                       <span>10px</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-400 uppercase flex items-center gap-1">
+                    <Palette size={12} /> {t('fields.strokeColor')}
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="color"
+                      value={selectedTerritory.strokeColor || selectedTerritory.color}
+                      onChange={(e) => onSaveTerritory({ ...selectedTerritory, strokeColor: e.target.value })}
+                      className="w-10 h-10 p-1 border border-gray-200 rounded-md cursor-pointer"
+                    />
+                    <div className="flex-1 flex flex-wrap gap-1">
+                      {['#000000', '#FFFFFF', '#3B82F6', '#EF4444', '#10B981'].map(c => (
+                        <button
+                          key={c}
+                          onClick={() => onSaveTerritory({ ...selectedTerritory, strokeColor: c })}
+                          className="w-4 h-4 rounded-full border border-gray-200"
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
                     </div>
                   </div>
                 </div>

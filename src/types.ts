@@ -25,8 +25,10 @@ export interface Territory {
   createdAt?: string;
   updatedAt?: string;
   activities?: ActivityLog[];
+  type?: 'area' | 'line';
   fillOpacity?: number;
   strokeWeight?: number;
+  strokeColor?: string;
   northBoundary?: string;
   southBoundary?: string;
   eastBoundary?: string;
