@@ -516,6 +516,7 @@ export const MapEditor: React.FC<MapEditorProps> = ({
   const [sidebarTab, setSidebarTab] = useState<'areas' | 'territories' | 'activity'>('territories');
   const [isEditingShape, setIsEditingShape] = useState(false);
   const [drawingType, setDrawingType] = useState<'area' | 'line'>('area');
+  const [isMerging, setIsMerging] = useState(false);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -550,10 +551,61 @@ export const MapEditor: React.FC<MapEditorProps> = ({
   }, [onSaveTerritory]);
 
   const handleSelectTerritory = useCallback((id: string) => {
+    if (isMerging && selectedTerritoryId && selectedTerritoryId !== id) {
+      handleMergeLines(selectedTerritoryId, id);
+      return;
+    }
     setSelectedTerritoryId(id);
     setIsSidebarOpen(true);
     setIsEditingShape(false);
-  }, []);
+  }, [isMerging, selectedTerritoryId]);
+
+  const handleMergeLines = (id1: string, id2: string) => {
+    const t1 = territories.find(t => t.id === id1);
+    const t2 = territories.find(t => t.id === id2);
+
+    if (!t1 || !t2 || t1.type !== 'line' || t2.type !== 'line') {
+      alert(t('messages.mergeError'));
+      setIsMerging(false);
+      return;
+    }
+
+    const p1 = t1.points;
+    const p2 = t2.points;
+
+    // Distances between endpoints
+    const dist = (pt1: Point, pt2: Point) => Math.sqrt(Math.pow(pt1.lat - pt2.lat, 2) + Math.pow(pt1.lng - pt2.lng, 2));
+
+    const s1 = p1[0];
+    const e1 = p1[p1.length - 1];
+    const s2 = p2[0];
+    const e2 = p2[p2.length - 1];
+
+    const d_e1_s2 = dist(e1, s2);
+    const d_e1_e2 = dist(e1, e2);
+    const d_s1_e2 = dist(s1, e2);
+    const d_s1_s2 = dist(s1, s2);
+
+    const min = Math.min(d_e1_s2, d_e1_e2, d_s1_e2, d_s1_s2);
+
+    let combinedPoints: Point[] = [];
+
+    if (min === d_e1_s2) {
+      combinedPoints = [...p1, ...p2];
+    } else if (min === d_e1_e2) {
+      combinedPoints = [...p1, ...[...p2].reverse()];
+    } else if (min === d_s1_e2) {
+      combinedPoints = [...p2, ...p1];
+    } else {
+      combinedPoints = [...[...p2].reverse(), ...p1];
+    }
+
+    onSaveTerritory({ ...t1, points: combinedPoints, updatedAt: new Date().toISOString() });
+    onDeleteTerritory(t2.id);
+    setSelectedTerritoryId(t1.id);
+    setIsMerging(false);
+    alert(t('messages.mergeSuccess'));
+  };
 
   const selectedTerritory = territories.find(t => t.id === selectedTerritoryId);
 
@@ -896,12 +948,15 @@ export const MapEditor: React.FC<MapEditorProps> = ({
             <MapContainer 
               center={[mapCenter.lat, mapCenter.lng]} 
               zoom={18} 
+              maxZoom={22}
               style={{ height: '100%', width: '100%', zIndex: 1 }}
               zoomControl={true}
             >
               <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution={mapProvider === 'osmand' ? '&copy; <a href="https://osmand.net/">OsmAnd</a>' : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
+                url={mapProvider === 'osmand' ? "https://tile.osmand.net/hd/{z}/{x}/{y}.png" : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"}
+                maxZoom={22}
+                maxNativeZoom={19}
               />
               <LeafletMapEvents onClick={handleMapClick} />
               <SetViewOnCenterChange center={[mapCenter.lat, mapCenter.lng]} />
@@ -991,7 +1046,7 @@ export const MapEditor: React.FC<MapEditorProps> = ({
                   </button>
                   <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-500 rounded-lg shadow-sm border border-gray-200">
                     <Globe size={14} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">{mapProvider === 'google' ? t('map.google') : t('map.osm')}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest">{mapProvider === 'google' ? t('map.google') : mapProvider === 'osm' ? t('map.osm') : t('map.osmand')}</span>
                   </div>
                 </>
               ) : (
@@ -1123,28 +1178,51 @@ export const MapEditor: React.FC<MapEditorProps> = ({
                 </button>
 
                 <div className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-medium text-gray-400 uppercase">{t('fields.name')}</label>
-                    <button
-                      onClick={() => setIsEditingShape(!isEditingShape)}
-                      className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${
-                        isEditingShape 
-                          ? 'bg-blue-600 text-white' 
-                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                      }`}
-                    >
-                      {isEditingShape ? 'TRAVAR FORMATO' : 'EDITAR FORMATO'}
-                    </button>
+                  <div className="flex justify-between items-center mb-1">
+                    {!isEditingShape && <label className="text-xs font-medium text-gray-400 uppercase">{t('fields.name')}</label>}
+                    <div className="flex gap-2 ml-auto">
+                      <button
+                        onClick={() => setIsEditingShape(!isEditingShape)}
+                        className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${
+                          isEditingShape 
+                            ? 'bg-blue-600 text-white' 
+                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                        }`}
+                      >
+                        {isEditingShape ? 'TRAVAR FORMATO' : 'EDITAR FORMATO'}
+                      </button>
+                      {selectedTerritory.type === 'line' && (
+                        <button
+                          onClick={() => setIsMerging(!isMerging)}
+                          className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${
+                            isMerging 
+                              ? 'bg-amber-600 text-white' 
+                              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          }`}
+                        >
+                          {isMerging ? t('map.cancel').toUpperCase() : t('fields.mergeLines').toUpperCase()}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <input
-                    type="text"
-                    value={selectedTerritory.name}
-                    onChange={(e) => onSaveTerritory({ ...selectedTerritory, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  />
-                  <p className="text-[10px] text-blue-500 font-medium italic mt-1 italic">
-                    * {t('map.editTip', 'Dica: Arraste os pontos no mapa para alterar o formato.')}
-                  </p>
+                  {!isEditingShape && (
+                    <input
+                      type="text"
+                      value={selectedTerritory.name}
+                      onChange={(e) => onSaveTerritory({ ...selectedTerritory, name: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    />
+                  )}
+                  {isEditingShape && (
+                    <p className="text-[10px] text-blue-500 font-medium italic mt-1 italic">
+                      * {t('map.editTip', 'Dica: Arraste os pontos no mapa para alterar o formato.')}
+                    </p>
+                  )}
+                  {isMerging && (
+                    <p className="text-[10px] text-amber-600 font-bold mt-2 animate-pulse">
+                      📍 {t('fields.selectSecondLine')}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex bg-gray-50 border border-gray-100 p-1 rounded-lg">

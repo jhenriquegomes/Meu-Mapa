@@ -25,6 +25,7 @@ const resources = {
         cancel: 'Cancel',
         google: 'Google',
         osm: 'OSM',
+        osmand: 'OsmAnd',
         details: 'Territory Details',
         manageAreas: 'Manage Areas',
         recentActivity: 'Recent Activity',
@@ -67,6 +68,8 @@ const resources = {
         drawingTools: 'Drawing Tools',
         area: 'Area',
         line: 'Line',
+        mergeLines: 'Merge Lines',
+        selectSecondLine: 'Select another line to merge with this one',
       },
       messages: {
         confirmClear: 'Are you sure you want to delete ALL territories? This action cannot be undone.',
@@ -78,6 +81,8 @@ const resources = {
         confirmDeleteActivity: 'Are you sure you want to delete this activity record?',
         editTip: 'Tip: Drag the points on the map to change the shape.',
         confirmEditShape: 'Do you want to enable shape editing for this territory on the map? (Be careful when dragging points)',
+        mergeSuccess: 'Lines merged successfully!',
+        mergeError: 'Please select another line to merge.',
       }
     }
   },
@@ -103,6 +108,7 @@ const resources = {
         cancel: 'Cancelar',
         google: 'Google',
         osm: 'OSM',
+        osmand: 'OsmAnd',
         details: 'Detalhes do Território',
         manageAreas: 'Gerenciar Áreas',
         recentActivity: 'Atividade Recente',
@@ -145,6 +151,8 @@ const resources = {
         drawingTools: 'Ferramentas de Desenho',
         area: 'Área',
         line: 'Linha',
+        mergeLines: 'Mesclar Linhas',
+        selectSecondLine: 'Selecione outra linha para juntar com esta',
       },
       messages: {
         confirmClear: 'Tem certeza que deseja excluir TODOS os territórios? Esta ação não pode ser desfeita.',
@@ -156,6 +164,8 @@ const resources = {
         confirmDeleteActivity: 'Tem certeza que deseja excluir este registro de atividade?',
         editTip: 'Dica: Arraste os pontos no mapa para alterar o formato.',
         confirmEditShape: 'Deseja habilitar a edição do formato deste território no mapa? (Cuidado ao arrastar os pontos)',
+        mergeSuccess: 'Linhas mescladas com sucesso!',
+        mergeError: 'Por favor, selecione outra linha para mesclar.',
       }
     }
   },
@@ -181,6 +191,7 @@ const resources = {
         cancel: 'Cancelar',
         google: 'Google',
         osm: 'OSM',
+        osmand: 'OsmAnd',
         details: 'Detalles del Territorio',
         manageAreas: 'Gestionar Áreas',
         recentActivity: 'Actividad Reciente',
@@ -223,6 +234,8 @@ const resources = {
         drawingTools: 'Herramientas de Dibujo',
         area: 'Área',
         line: 'Línea',
+        mergeLines: 'Combinar Líneas',
+        selectSecondLine: 'Seleccione otra línea para unir con esta',
       },
       messages: {
         confirmClear: '¿Está seguro de que deseja eliminar TODOS los territorios? Esta acción no se puede deshacer.',
@@ -234,6 +247,8 @@ const resources = {
         confirmDeleteActivity: '¿Está seguro de que deseja eliminar este registro de actividad?',
         editTip: 'Consejo: Arrastre os puntos no mapa para alterar o formato.',
         confirmEditShape: '¿Desea habilitar la edición de la forma de este territorio en el mapa? (Tenga cuidado al arrastrar los puntos)',
+        mergeSuccess: '¡Líneas combinadas con éxito!',
+        mergeError: 'Por favor, seleccione otra línea para combinar.',
       }
     }
   }

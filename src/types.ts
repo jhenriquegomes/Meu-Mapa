@@ -43,7 +43,7 @@ export interface MapData {
   userId: string;
 }
 
-export type MapProvider = 'google' | 'osm';
+export type MapProvider = 'google' | 'osm' | 'osmand';
 
 export interface TerritoryGroup {
   id: string;

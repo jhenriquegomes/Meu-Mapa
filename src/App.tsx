@@ -340,6 +340,28 @@ export default function App() {
                         <p className="text-[10px] text-gray-400 leading-tight">Free, community-driven & reliable baseline.</p>
                       </div>
                     </button>
+
+                    <button
+                      onClick={() => setMapProvider('osmand')}
+                      className={`relative p-4 rounded-xl border-2 transition-all flex flex-col gap-3 text-left ${
+                        mapProvider === 'osmand' 
+                        ? 'border-black bg-gray-50' 
+                        : 'border-gray-100 hover:border-gray-200'
+                      }`}
+                    >
+                      {mapProvider === 'osmand' && (
+                        <div className="absolute top-3 right-3 w-5 h-5 bg-black text-white rounded-full flex items-center justify-center">
+                          <Check size={12} />
+                        </div>
+                      )}
+                      <div className="p-2 bg-white rounded-lg w-fit shadow-sm border border-gray-100">
+                        <div className="w-8 h-4 bg-[#FF7F00] rounded flex items-center justify-center text-[8px] text-white font-bold">OSMAND</div>
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm">OsmAnd Style</p>
+                        <p className="text-[10px] text-gray-400 leading-tight">A different topographic style inspired by OsmAnd.</p>
+                      </div>
+                    </button>
                   </div>
                 </div>
 

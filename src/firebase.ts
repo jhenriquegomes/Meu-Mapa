@@ -47,6 +47,11 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     alert('⚠️ Limite diário de uso atingido. As alterações não serão salvas até que o Firebase reinicie sua cota gratuita (geralmente à meia-noite).');
   }
 
+  // Check for availability/offline
+  if (errorMessage.toLowerCase().includes('unavailable') || errorMessage.toLowerCase().includes('failed to connect')) {
+    alert('⚠️ Erro de conexão com o banco de dados. Verifique sua internet ou tente novamente mais tarde. (O app pode estar operando em modo offline temporário)');
+  }
+
   const errInfo: FirestoreErrorInfo = {
     error: errorMessage,
     authInfo: {
